@@ -6,26 +6,29 @@ Copyright 2017 Allen Downey
 License: https://creativecommons.org/licenses/by/4.0)
 """
 
-#TODO: check that we have at least version 3.6
-
-import inspect
-
 import logging
 logger = logging.getLogger(name='modsim.py')
 
+# make sure we have Python 3.6 or better
+import sys
+if sys.version_info < (3, 6):
+    logger.warn('modsim.py depends on Python 3.6 features.')
+
+import inspect
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy
+import sympy
 
 import seaborn as sns
 sns.set(style='white', font_scale=1.5)
 
-import scipy
-import sympy
 import pint
 UNITS = pint.UnitRegistry()
 Quantity = UNITS.Quantity
 
+# expose some names so we can use them without dot notation
 from copy import copy
 from numpy import sqrt, log, exp, pi
 from pandas import DataFrame, Series
@@ -35,7 +38,6 @@ from scipy.interpolate import interp1d
 from scipy.integrate import odeint
 from scipy.optimize import leastsq
 from scipy.optimize import minimize_scalar
-
 
 
 def linspace(start, stop, num=50, **kwargs):
@@ -452,6 +454,9 @@ class FigureState:
         self.lines = dict()
 
 
+# TODO: Split plot into simplot(), which adds points to existing lines,
+# and plot(), which does not
+        
 def plot(*args, **kwargs):
     """Makes line plots.
     
@@ -887,32 +892,32 @@ class _Vector(Quantity):
 
     def hat(self):
         """Returns the unit vector in the direction of self."""
-        """
-        """
-        return self / self.mag * self.units
+        return self / self.mag
 
+    def perp(self):
+        """Returns a perpendicular Vector (rotated left).
+
+        Only works with 2-D Vectors.
+
+        returns: Vector
+        """
+        assert len(self) == 2
+        return Vector(-self.y, self.x)
+    
     def dot(self, other):
         """Returns the dot product of self and other."""
-        """
-        """
         return np.dot(self, other) * self.units * other.units
 
     def cross(self, other):
         """Returns the cross product of self and other."""
-        """
-        """
         return np.cross(self, other) * self.units * other.units
 
     def proj(self, other):
         """Returns the projection of self onto other."""
-        """
-        """
         return np.dot(self, other) * other.hat()
 
     def comp(self, other):
         """Returns the magnitude of the projection of self onto other."""
-        """
-        """
         return np.dot(self, other.hat()) * other.units
 
     def dist(self, other):
@@ -956,7 +961,28 @@ def Vector(*args, units=None):
     return _Vector(args, found_units)
 
 
+def plot_segment(A, B, **options):
+    """Plots a line segment between two Vectors.
+
+    Additional options are passed along to plot().
+
+    A: Vector
+    B: Vector
+    """
+    xs = A.x, B.x
+    ys = A.y, B.y
+    plot(xs, ys, **options)
+    
+
 def cart2pol(x, y, z=None):
+    """Convert Cartesian coordinates to polar.
+
+    x: number or sequence
+    y: number or sequence
+    z: number or sequence (optional)
+
+    returns: theta, rho OR theta, rho, z
+    """
     x = np.asarray(x)
     y = np.asarray(y)
 
@@ -970,6 +996,14 @@ def cart2pol(x, y, z=None):
 
 
 def pol2cart(theta, rho, z=None):
+    """Convert polar coordinates to Cartesian.
+
+    theta: number or sequence
+    rho: number or sequence
+    z: number or sequence (optional)
+
+    returns: x, y OR x, y, z
+    """
     if hasattr(theta, 'units'):
         if theta.units == UNITS.degree:
             theta = theta.to(UNITS.radian)
